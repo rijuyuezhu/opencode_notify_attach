@@ -21,13 +21,22 @@ script_dir="${script_path%/*}"
 script_dir="$(cd -P "$script_dir" && pwd)"
 source "$script_dir/../lib/attach-state.sh"
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-  printf 'usage: %s <server-url> [dir]\n' "${0##*/}" >&2
+if [[ $# -lt 1 ]]; then
+  printf 'usage: %s <server-url> [dir] [attach-args...]\n' "${0##*/}" >&2
   exit 64
 fi
 
 server_url="$1"
-target_dir="${2:-$(pwd)}"
+shift
+
+if [[ $# -gt 0 && "$1" != -* ]]; then
+  target_dir="$1"
+  shift
+else
+  target_dir="$(pwd)"
+fi
+
+attach_args=("$@")
 opencode_bin="${OPENCODE_BIN:-opencode}"
 record_path="$(attach_state_register "$target_dir" "$server_url")"
 
@@ -41,7 +50,7 @@ trap 'cleanup; exit 143' TERM
 trap 'cleanup; exit 129' HUP
 
 set +e
-"$opencode_bin" attach "$server_url" --dir "$target_dir"
+"$opencode_bin" attach "$server_url" --dir "$target_dir" "${attach_args[@]}"
 status=$?
 set -e
 

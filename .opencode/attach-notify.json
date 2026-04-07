@@ -1,0 +1,18 @@
+{
+  "enableOnDesktop": true,
+  "notifyScript": "./bin/notify-if-attach",
+  "events": {
+    "permission": true,
+    "complete": true,
+    "error": true,
+    "question": true,
+    "plan_exit": true
+  },
+  "messages": {
+    "permission": "Session needs permission",
+    "complete": "Session has finished",
+    "error": "Session encountered an error",
+    "question": "Session has a question",
+    "plan_exit": "Plan ready for review"
+  }
+}

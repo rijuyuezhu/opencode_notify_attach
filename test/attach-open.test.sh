@@ -28,10 +28,10 @@ chmod +x "$fake_opencode"
 
 export OPENCODE_BIN="$fake_opencode"
 
-"$(dirname "$0")/../bin/attach-open" http://localhost:56666 "$tmp_dir/project"
+"$(dirname "$0")/../bin/attach-open" http://localhost:56666 "$tmp_dir/project" --continue --print-logs
 
 assert_eq "1" "$(<"$ATTACH_STATE_ROOT/seen-count")"
-assert_eq "attach http://localhost:56666 --dir $tmp_dir/project" "$(<"$ATTACH_STATE_ROOT/seen-args")"
+assert_eq "attach http://localhost:56666 --dir $tmp_dir/project --continue --print-logs" "$(<"$ATTACH_STATE_ROOT/seen-args")"
 assert_eq "0" "$(attach_state_active_count)"
 
 set +e
