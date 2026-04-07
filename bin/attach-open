@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_path="${BASH_SOURCE[0]}"
+
+if [[ "$script_path" != */* ]]; then
+  script_path="$(command -v -- "$script_path")"
+fi
+
+while [[ -L "$script_path" ]]; do
+  script_dir="${script_path%/*}"
+  script_dir="$(cd -P "$script_dir" && pwd)"
+  script_path="$(readlink "$script_path")"
+  if [[ "$script_path" != /* ]]; then
+    script_path="$script_dir/$script_path"
+  fi
+done
+
+script_dir="${script_path%/*}"
+script_dir="$(cd -P "$script_dir" && pwd)"
+source "$script_dir/../lib/attach-state.sh"
+
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  printf 'usage: %s <server-url> [dir]\n' "${0##*/}" >&2
+  exit 64
+fi
+
+server_url="$1"
+target_dir="${2:-$(pwd)}"
+opencode_bin="${OPENCODE_BIN:-opencode}"
+record_path="$(attach_state_register "$target_dir" "$server_url")"
+
+cleanup() {
+  attach_state_unregister "$record_path"
+}
+
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+trap 'cleanup; exit 129' HUP
+
+set +e
+"$opencode_bin" attach "$server_url" --dir "$target_dir"
+status=$?
+set -e
+
+exit "$status"
