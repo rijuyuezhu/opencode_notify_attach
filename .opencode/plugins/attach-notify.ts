@@ -6,8 +6,8 @@ import { createAttachNotifyPlugin } from "../../lib/attach-notify-plugin"
 const pluginFilePath = fileURLToPath(import.meta.url)
 const repoRoot = resolve(dirname(pluginFilePath), "../..")
 
-export const AttachNotifyPlugin = async ({ directory }: { directory?: string }) => {
-  return createAttachNotifyPlugin({ directory, configRoot: repoRoot })
+export const AttachNotifyPlugin = async ({ client, directory }: { client?: unknown; directory?: string }) => {
+  return createAttachNotifyPlugin({ client, directory, configRoot: repoRoot })
 }
 
 export default AttachNotifyPlugin

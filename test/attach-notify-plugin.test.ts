@@ -70,7 +70,13 @@ describe("createAttachNotifyPlugin", () => {
       directory: "/work/project",
       clientEnv: "web",
       readConfig: () => JSON.stringify({ enableOnDesktop: true }),
-      getSessionTitle: async (sessionID) => (sessionID === "ses-1" ? "Fix login bug" : null),
+      client: {
+        session: {
+          get: async ({ path }: { path: { id: string } }) => ({
+            data: path.id === "ses-1" ? { title: "Fix login bug" } : null,
+          }),
+        },
+      },
       runNotify: async (scriptPath, event, title, message) => {
         calls.push({ scriptPath, event, title, message })
       },
@@ -134,5 +140,33 @@ describe("createAttachNotifyPlugin", () => {
     await plugin["permission.ask"]?.()
 
     expect(calls).toEqual([{ event: "permission", title: "OpenCode", message: "Ask fallback" }])
+  })
+
+  test("falls back to OpenCode when session lookup fails", async () => {
+    const calls: Array<{ event: string; title: string; message: string }> = []
+    const plugin = await createAttachNotifyPlugin({
+      directory: "/work/project",
+      clientEnv: "cli",
+      client: {
+        session: {
+          get: async () => {
+            throw new Error("boom")
+          },
+        },
+      },
+      runNotify: async (_scriptPath, event, title, message) => {
+        calls.push({ event, title, message })
+      },
+    })
+
+    await plugin.event?.({ event: { type: "session.error", properties: { sessionID: "ses-missing" } } })
+
+    expect(calls).toEqual([
+      {
+        event: "error",
+        title: "OpenCode",
+        message: "Session encountered an error",
+      },
+    ])
   })
 })

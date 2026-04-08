@@ -10,6 +10,12 @@ type HookMap = {
   "tool.execute.before"?: (input: { tool: string }) => Promise<void>
 }
 
+interface SessionClient {
+  session?: {
+    get?: (input: { path: { id: string } }) => Promise<{ data?: { title?: unknown } | null }>
+  }
+}
+
 type ReadConfig = () => string | null
 type RunNotify = (scriptPath: string, event: AttachNotifyEvent, title: string, message: string) => Promise<void>
 type GetSessionTitle = (sessionID: string) => Promise<string | null>
@@ -147,7 +153,19 @@ async function resolveTitle(source: unknown, getSessionTitle: GetSessionTitle): 
   return sessionTitle
 }
 
+function createSessionTitleResolver(client?: SessionClient): GetSessionTitle {
+  return async (sessionID: string) => {
+    try {
+      const response = await client?.session?.get?.({ path: { id: sessionID } })
+      return typeof response?.data?.title === "string" && response.data.title.length > 0 ? response.data.title : null
+    } catch {
+      return null
+    }
+  }
+}
+
 export async function createAttachNotifyPlugin(options: {
+  client?: SessionClient
   directory?: string
   configRoot?: string
   clientEnv?: string | null
@@ -162,11 +180,7 @@ export async function createAttachNotifyPlugin(options: {
   })
   const clientEnv = options.clientEnv ?? process.env.OPENCODE_CLIENT ?? null
   const runNotify = options.runNotify ?? runNotifyScript
-  const getSessionTitle =
-    options.getSessionTitle ??
-    (async () => {
-      return null
-    })
+  const getSessionTitle = options.getSessionTitle ?? createSessionTitleResolver(options.client)
 
   if (clientEnv && clientEnv !== "cli" && !config.enableOnDesktop) {
     return {}
