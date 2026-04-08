@@ -65,53 +65,59 @@ describe("createAttachNotifyPlugin", () => {
   })
 
   test("maps OpenCode events to notify-if-attach invocations", async () => {
-    const calls: Array<{ event: string; message: string; scriptPath: string }> = []
+    const calls: Array<{ event: string; title: string; message: string; scriptPath: string }> = []
     const plugin = await createAttachNotifyPlugin({
       directory: "/work/project",
       clientEnv: "web",
       readConfig: () => JSON.stringify({ enableOnDesktop: true }),
-      runNotify: async (scriptPath, event, message) => {
-        calls.push({ scriptPath, event, message })
+      getSessionTitle: async (sessionID) => (sessionID === "ses-1" ? "Fix login bug" : null),
+      runNotify: async (scriptPath, event, title, message) => {
+        calls.push({ scriptPath, event, title, message })
       },
     })
 
-    await plugin.event?.({ event: { type: "permission.asked" } })
-    await plugin.event?.({ event: { type: "session.idle" } })
-    await plugin.event?.({ event: { type: "session.error" } })
-    await plugin["tool.execute.before"]?.({ tool: "question" })
+    await plugin.event?.({ event: { type: "permission.asked", properties: { sessionID: "ses-1" } } })
+    await plugin.event?.({ event: { type: "session.idle", properties: { sessionID: "ses-1" } } })
+    await plugin.event?.({ event: { type: "session.error", properties: { sessionID: "ses-1" } } })
+    await plugin["tool.execute.before"]?.({ tool: "question", sessionID: "ses-1" })
     await plugin["tool.execute.before"]?.({ tool: "plan_exit" })
 
     expect(calls).toEqual([
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "permission",
+        title: "Fix login bug",
         message: "Session needs permission",
       },
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "complete",
+        title: "Fix login bug",
         message: "Session has finished",
       },
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "error",
+        title: "Fix login bug",
         message: "Session encountered an error",
       },
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "question",
+        title: "Fix login bug",
         message: "Session has a question",
       },
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "plan_exit",
+        title: "OpenCode",
         message: "Plan ready for review",
       },
     ])
   })
 
   test("respects disabled events and permission.ask fallback", async () => {
-    const calls: Array<{ event: string; message: string }> = []
+    const calls: Array<{ event: string; title: string; message: string }> = []
     const plugin = await createAttachNotifyPlugin({
       directory: "/work/project",
       clientEnv: "cli",
@@ -119,14 +125,14 @@ describe("createAttachNotifyPlugin", () => {
         events: { complete: false },
         messages: { permission: "Ask fallback" },
       }),
-      runNotify: async (_scriptPath, event, message) => {
-        calls.push({ event, message })
+      runNotify: async (_scriptPath, event, title, message) => {
+        calls.push({ event, title, message })
       },
     })
 
     await plugin.event?.({ event: { type: "session.idle" } })
     await plugin["permission.ask"]?.()
 
-    expect(calls).toEqual([{ event: "permission", message: "Ask fallback" }])
+    expect(calls).toEqual([{ event: "permission", title: "OpenCode", message: "Ask fallback" }])
   })
 })

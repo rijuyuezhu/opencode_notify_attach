@@ -11,7 +11,8 @@ type HookMap = {
 }
 
 type ReadConfig = () => string | null
-type RunNotify = (scriptPath: string, event: AttachNotifyEvent, message: string) => Promise<void>
+type RunNotify = (scriptPath: string, event: AttachNotifyEvent, title: string, message: string) => Promise<void>
+type GetSessionTitle = (sessionID: string) => Promise<string | null>
 
 export interface AttachNotifyConfig {
   enableOnDesktop: boolean
@@ -89,9 +90,9 @@ export function loadAttachNotifyConfig(options: { directory?: string; configRoot
   }
 }
 
-export async function runNotifyScript(scriptPath: string, event: AttachNotifyEvent, message: string): Promise<void> {
+export async function runNotifyScript(scriptPath: string, event: AttachNotifyEvent, title: string, message: string): Promise<void> {
   await new Promise<void>((resolvePromise) => {
-    const child = spawn(scriptPath, [event, message], {
+    const child = spawn(scriptPath, [event, title, message], {
       stdio: "ignore",
       detached: true,
     })
@@ -106,12 +107,44 @@ async function emitConfiguredEvent(
   config: AttachNotifyConfig,
   runNotify: RunNotify,
   event: AttachNotifyEvent,
+  title: string,
 ): Promise<void> {
   if (!config.events[event]) {
     return
   }
 
-  await runNotify(config.notifyScript, event, config.messages[event])
+  await runNotify(config.notifyScript, event, title, config.messages[event])
+}
+
+function getSessionID(source: unknown): string | null {
+  const candidate = (source as { sessionID?: unknown; properties?: { sessionID?: unknown } } | null)
+  if (!candidate) {
+    return null
+  }
+
+  if (typeof candidate.sessionID === "string" && candidate.sessionID.length > 0) {
+    return candidate.sessionID
+  }
+
+  if (typeof candidate.properties?.sessionID === "string" && candidate.properties.sessionID.length > 0) {
+    return candidate.properties.sessionID
+  }
+
+  return null
+}
+
+async function resolveTitle(source: unknown, getSessionTitle: GetSessionTitle): Promise<string> {
+  const sessionID = getSessionID(source)
+  if (!sessionID) {
+    return "OpenCode"
+  }
+
+  const sessionTitle = await getSessionTitle(sessionID)
+  if (!sessionTitle) {
+    return "OpenCode"
+  }
+
+  return sessionTitle
 }
 
 export async function createAttachNotifyPlugin(options: {
@@ -120,6 +153,7 @@ export async function createAttachNotifyPlugin(options: {
   clientEnv?: string | null
   readConfig?: ReadConfig
   runNotify?: RunNotify
+  getSessionTitle?: GetSessionTitle
 }): Promise<HookMap> {
   const config = loadAttachNotifyConfig({
     directory: options.directory,
@@ -128,6 +162,11 @@ export async function createAttachNotifyPlugin(options: {
   })
   const clientEnv = options.clientEnv ?? process.env.OPENCODE_CLIENT ?? null
   const runNotify = options.runNotify ?? runNotifyScript
+  const getSessionTitle =
+    options.getSessionTitle ??
+    (async () => {
+      return null
+    })
 
   if (clientEnv && clientEnv !== "cli" && !config.enableOnDesktop) {
     return {}
@@ -136,27 +175,27 @@ export async function createAttachNotifyPlugin(options: {
   return {
     event: async ({ event }) => {
       if (event.type === "permission.asked") {
-        await emitConfiguredEvent(config, runNotify, "permission")
+        await emitConfiguredEvent(config, runNotify, "permission", await resolveTitle(event, getSessionTitle))
       }
 
       if (event.type === "session.idle") {
-        await emitConfiguredEvent(config, runNotify, "complete")
+        await emitConfiguredEvent(config, runNotify, "complete", await resolveTitle(event, getSessionTitle))
       }
 
       if (event.type === "session.error") {
-        await emitConfiguredEvent(config, runNotify, "error")
+        await emitConfiguredEvent(config, runNotify, "error", await resolveTitle(event, getSessionTitle))
       }
     },
     "permission.ask": async () => {
-      await emitConfiguredEvent(config, runNotify, "permission")
+      await emitConfiguredEvent(config, runNotify, "permission", "OpenCode")
     },
     "tool.execute.before": async (input) => {
       if (input.tool === "question") {
-        await emitConfiguredEvent(config, runNotify, "question")
+        await emitConfiguredEvent(config, runNotify, "question", await resolveTitle(input, getSessionTitle))
       }
 
       if (input.tool === "plan_exit") {
-        await emitConfiguredEvent(config, runNotify, "plan_exit")
+        await emitConfiguredEvent(config, runNotify, "plan_exit", await resolveTitle(input, getSessionTitle))
       }
     },
   }
