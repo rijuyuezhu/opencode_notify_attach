@@ -64,7 +64,7 @@ describe("createAttachNotifyPlugin", () => {
     expect(plugin).toEqual({})
   })
 
-  test("maps OpenCode events to notify-if-attach invocations", async () => {
+  test("maps OpenCode events to project-name notification titles", async () => {
     const calls: Array<{ event: string; title: string; message: string; scriptPath: string }> = []
     const plugin = await createAttachNotifyPlugin({
       directory: "/work/project",
@@ -92,31 +92,31 @@ describe("createAttachNotifyPlugin", () => {
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "permission",
-        title: "Fix login bug",
+        title: "OpenCode (project)",
         message: "Session needs permission",
       },
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "complete",
-        title: "Fix login bug",
+        title: "OpenCode (project)",
         message: "Session has finished",
       },
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "error",
-        title: "Fix login bug",
+        title: "OpenCode (project)",
         message: "Session encountered an error",
       },
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "question",
-        title: "Fix login bug",
+        title: "OpenCode (project)",
         message: "Session has a question",
       },
       {
         scriptPath: "/work/project/bin/notify-if-attach",
         event: "plan_exit",
-        title: "OpenCode",
+        title: "OpenCode (project)",
         message: "Plan ready for review",
       },
     ])
@@ -139,10 +139,10 @@ describe("createAttachNotifyPlugin", () => {
     await plugin.event?.({ event: { type: "session.idle" } })
     await plugin["permission.ask"]?.()
 
-    expect(calls).toEqual([{ event: "permission", title: "OpenCode", message: "Ask fallback" }])
+    expect(calls).toEqual([{ event: "permission", title: "OpenCode (project)", message: "Ask fallback" }])
   })
 
-  test("falls back to OpenCode when session lookup fails", async () => {
+  test("uses project-name title even when session lookup fails", async () => {
     const calls: Array<{ event: string; title: string; message: string }> = []
     const plugin = await createAttachNotifyPlugin({
       directory: "/work/project",
@@ -164,7 +164,7 @@ describe("createAttachNotifyPlugin", () => {
     expect(calls).toEqual([
       {
         event: "error",
-        title: "OpenCode",
+        title: "OpenCode (project)",
         message: "Session encountered an error",
       },
     ])

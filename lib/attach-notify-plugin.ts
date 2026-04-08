@@ -122,6 +122,15 @@ async function emitConfiguredEvent(
   await runNotify(config.notifyScript, event, title, config.messages[event])
 }
 
+function getNotificationTitle(directory?: string): string {
+  const projectName = getProjectName(directory)
+  if (projectName) {
+    return `OpenCode (${projectName})`
+  }
+
+  return "OpenCode"
+}
+
 function getSessionID(source: unknown): string | null {
   const candidate = (source as { sessionID?: unknown; properties?: { sessionID?: unknown } } | null)
   if (!candidate) {
@@ -181,6 +190,7 @@ export async function createAttachNotifyPlugin(options: {
   const clientEnv = options.clientEnv ?? process.env.OPENCODE_CLIENT ?? null
   const runNotify = options.runNotify ?? runNotifyScript
   const getSessionTitle = options.getSessionTitle ?? createSessionTitleResolver(options.client)
+  const notificationTitle = getNotificationTitle(options.directory)
 
   if (clientEnv && clientEnv !== "cli" && !config.enableOnDesktop) {
     return {}
@@ -189,27 +199,27 @@ export async function createAttachNotifyPlugin(options: {
   return {
     event: async ({ event }) => {
       if (event.type === "permission.asked") {
-        await emitConfiguredEvent(config, runNotify, "permission", await resolveTitle(event, getSessionTitle))
+        await emitConfiguredEvent(config, runNotify, "permission", notificationTitle)
       }
 
       if (event.type === "session.idle") {
-        await emitConfiguredEvent(config, runNotify, "complete", await resolveTitle(event, getSessionTitle))
+        await emitConfiguredEvent(config, runNotify, "complete", notificationTitle)
       }
 
       if (event.type === "session.error") {
-        await emitConfiguredEvent(config, runNotify, "error", await resolveTitle(event, getSessionTitle))
+        await emitConfiguredEvent(config, runNotify, "error", notificationTitle)
       }
     },
     "permission.ask": async () => {
-      await emitConfiguredEvent(config, runNotify, "permission", "OpenCode")
+      await emitConfiguredEvent(config, runNotify, "permission", notificationTitle)
     },
     "tool.execute.before": async (input) => {
       if (input.tool === "question") {
-        await emitConfiguredEvent(config, runNotify, "question", await resolveTitle(input, getSessionTitle))
+        await emitConfiguredEvent(config, runNotify, "question", notificationTitle)
       }
 
       if (input.tool === "plan_exit") {
-        await emitConfiguredEvent(config, runNotify, "plan_exit", await resolveTitle(input, getSessionTitle))
+        await emitConfiguredEvent(config, runNotify, "plan_exit", notificationTitle)
       }
     },
   }
